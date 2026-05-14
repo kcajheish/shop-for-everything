@@ -12,7 +12,7 @@ importlib-metadata==1.5.0
 kombu==4.6.7
 Markdown==3.1.1
 mysqlclient==1.4.6
-Pillow==7.0.0
+Pillow==12.2.0
 pycparser==2.19
 Pygments==2.5.2
 python-http-client==3.2.4
