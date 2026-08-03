@@ -29,8 +29,8 @@ class OrderProduct(models.Model):
     from_user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='sold_product')
     to_user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='bought_product')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='sold_items')
-    quantity = models.IntegerField(validators=[MinValueValidator])
-    expense = models.IntegerField(validators=[MinValueValidator])
+    quantity = models.IntegerField(validators=[MinValueValidator(0)])
+    expense = models.IntegerField(validators=[MinValueValidator(0)])
 
     def save(self, *args, **kwargs):        
         super().save(*args, **kwargs)

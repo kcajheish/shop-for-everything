@@ -1,15 +1,13 @@
 from .models import Product
-from django.forms import ModelForm, HiddenInput
+from django.forms import ModelForm
 from django.utils.translation import gettext_lazy as _
 
 class ProductForm(ModelForm):
 
     class Meta:
         model = Product
-        fields = ['author', 'name', 'description', 'price', 'stock', 'image']
-        widgets = {'author':HiddenInput()}
+        fields = ['name', 'description', 'price', 'stock', 'image']
         labels = {
-            'author': _('店家'),
             'name': _('商品名稱'),
             'description': _('商品描述'),
             'price': _('價位'),

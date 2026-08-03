@@ -29,45 +29,58 @@ Review date: 2026-08-03. Priorities are descending (P0 = fix first). Line number
 
 ## P1 — High (crash bugs / wrong behavior)
 
+> Status: all nine P1 items FIXED on 2026-08-03. Verified by regression tests
+> (`products/tests/test_views.py`, `products/tests/test_models.py`, `cart/tests.py`,
+> `users/tests.py`, `orders/tests.py`) — run with `python manage.py test`.
+
 ### 5. `product_detail` 500s on unknown slug
 - `products/views.py:49` — `Product.objects.get(slug=slug)` raises `DoesNotExist` → 500.
 - Fix: `get_object_or_404(Product, slug=slug)`.
+- Done: unknown slugs now return 404. Test: `ProductDetailTest::test_unknown_slug_returns_404`.
 
 ### 6. Search crashes on a fresh session / bad input, and returns duplicates
 - `products/views.py:82-83` — visiting `/product/search` without a `query` param and with no prior search raises `KeyError: 'query'`.
 - Fix: `request.session.get('query', '')`.
 - `products/views.py:86-89` — a multi-token query returns the same product once per matching token (duplicates), and an empty token matches everything (`name__icontains=''`).
 - Fix: filter once with `Q` objects (`reduce(operator.or_, ...)`), and drop empty tokens.
+- Done: `product_search` uses `request.session.get('query', '')`, drops empty tokens, and filters once with `Q`/`reduce` (no duplicates, no all-match). Tests: `ProductSearchTest`.
 
 ### 7. Pagination raises on bad/out-of-range page numbers
 - `products/views.py:23,97` — `int(page_number)` raises `ValueError`; `paginator.page()` raises `EmptyPage` for out-of-range values (only prev/next are guarded).
 - Fix: use `paginator.get_page(page_number)` (already computed as `product_list`) instead of `paginator.page(...)`, which returns the last page for out-of-range values.
+- Done: `product_list` and `product_search` now use `paginator.get_page(...)`; `page=abc` → first page, out-of-range → last page. Tests: `PaginationTest`.
 
 ### 8. Cart update/delete crash on missing POST data or wrong method
 - `cart/views.py:11-12,28-29` — `request.POST['quantity']` / `request.POST['is_processed']` / `request.POST['product_id']` raise `MultiValueDictKeyError` (500) when absent; `cart_delete` also runs on GET. `cart/decorators.py:7-8` has the same issue.
 - Fix: add `@require_POST` to both views and read via `request.POST.get(...)` / validate the quantity.
+- Done: `cart_update` is POST-only and `stock_should_enough` validates `1 <= quantity <= stock` (redirecting with a message); `cart_delete` is POST-only, reads `product_id` via `.get()`, and returns a safe JSON response. Tests: `CartDeleteTest`.
 
 ### 9. `Product.save()` image resize silently never runs; slug collisions 500
 - `products/models.py:38-46` — `img.thumbnail(size)` returns `None` (it resizes in place), so `img_resize.save(...)` raises `AttributeError`, swallowed by bare `except: pass`. The 300x300 resize has never worked.
 - Fix: `img.thumbnail(size); img.save(initial_path, quality=95)` and only swallow `IOError`.
 - `products/models.py:34-35` — `save()` re-slugifies on every save, so two products with the same name produce the same slug → `IntegrityError` (unique constraint) → 500.
 - Fix: only set the slug on create, and append a suffix (e.g. `-2`) on collision.
+- Done: `Product.save()` only sets the slug on create (unique `-2`, `-3`, … suffix on collision, stable on update), and the resize now actually runs (`img.thumbnail(size)` + `img.save(...)`, only `IOError`/`OSError` swallowed; the shared `/default.jpg` placeholder is skipped). Tests: `ProductSlugTest`, `ProductImageResizeTest`.
 
 ### 10. `MinValueValidator` passed as a class, not an instance
 - `orders/models.py:32-33` — `validators=[MinValueValidator]` (and same for `expense`) instantiates the class with the field value as `limit_value`, which never raises — validation is a silent no-op, so negative quantity/expense are accepted.
 - Fix: `validators=[MinValueValidator(0)]`.
+- Done: `OrderProduct.quantity` and `expense` now use `MinValueValidator(0)`. Tests: `OrderProductValidatorTest`.
 
 ### 11. Deleted products left in carts crash cart/checkout and orphan orders
 - `cart/cart.py:43` — `Cart.__iter__` does `Product.objects.get(pk=...)`; deleting a product that's in a session cart → `DoesNotExist` → 500 on `/cart/detail` or checkout. `orders/views.py:17-18` iterates the cart after already saving the `Order`, so a failure leaves an empty orphan order.
 - Fix: use `product_id__in=self.cart.keys()` with a queryset lookup and skip missing products; validate the cart is non-empty and all products exist before creating the `Order`.
+- Done: `Cart.__iter__` fetches via `Product.objects.filter(pk__in=...)` and skips deleted items; checkout verifies every cart product still exists (redirects with a message before the `Order` is created). Tests: `CheckoutTest::test_checkout_redirects_when_cart_contains_deleted_product`, `test_cart_detail_renders_with_deleted_product`.
 
 ### 12. Product creation lets a user claim another author
 - `products/forms.py:9` + `templates/products/create.html:74` — `author` is a client-controlled hidden form field; a POST can set `author` to any user id, spoofing ownership (which `product_delete` then trusts).
 - Fix: remove `author` from `fields`, drop the widget, and set `form.instance.author = request.user` in `product_create`.
+- Done: `author` removed from `ProductForm.fields` and from the template; `product_create` sets `product.author = request.user`. Test: `ProductCreateAuthorTest` (spoofed `author` is ignored).
 
 ### 13. Sign-up 500s when password fields are empty/invalid
 - `users/forms.py:22-28` — `clean()` indexes `cd['password']` / `cd['password_confirm']`, but an empty (required) password is deleted from `cleaned_data` during field cleaning → `KeyError` → 500.
 - Fix: `password = cd.get('password')` and guard with `if password and password_confirm`.
+- Done: `SignUpForm.clean()` uses `.get()` with guards. Tests: `SignUpFormTest` (empty/mismatched passwords render the form instead of 500, valid signup still succeeds).
 
 ## P2 — Medium (correctness / robustness)
 

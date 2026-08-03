@@ -4,24 +4,21 @@ from .models import Product
 from .forms import ProductForm
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
-from django.views.generic.list import ListView
-import re
-from django.http import Http404
+from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from .decorators import member_is_owner_of_product
+from functools import reduce
+import operator
+import re
+
 def product_list(request):
 
     products = Product.objects.all()
 
     #每頁顯示3個產品
     paginator = Paginator(products, 3)
-    
-    page_number = request.GET.get('page')
 
-    page_number = 1 if page_number == None else int(page_number)
-
-    current_page = paginator.page(page_number)
-    product_list = paginator.get_page(page_number)
+    current_page = paginator.get_page(request.GET.get('page'))
     page_array = list(range(1,paginator.num_pages + 1))
 
     try:
@@ -46,7 +43,7 @@ def product_list(request):
 
 
 def product_detail(request, slug):
-    product = Product.objects.get(slug = slug)
+    product = get_object_or_404(Product, slug = slug)
     return render(request, 'products/detail.html', {'product' : product})
 
 @login_required
@@ -54,10 +51,12 @@ def product_create(request):
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES)
         if form.is_valid():
-            product = form.save()
+            product = form.save(commit=False)
+            product.author = request.user
+            product.save()
             return HttpResponseRedirect(product.get_absolute_url())
     else:
-        form = ProductForm(initial={'author':request.user})
+        form = ProductForm()
     return render(request, 'products/create.html', {'form' : form})
 
 @member_is_owner_of_product
@@ -74,28 +73,24 @@ def product_delete(request):
 def product_delete_success(request):
     return render(request, 'products/product_delete_success.html')
 
+@require_http_methods(['GET'])
 def product_search(request):
-    
-    if request.method != "GET":
-        raise Http404('你沒有權限')
-    data=request.GET.get('query', None)
-    if data == None:
-        data = request.session['query']
-    else:
+    data = request.GET.get('query', '')
+    if data:
         request.session['query'] = data
-    query_list = re.split("[,\- @!~#$%^&*()><?/|]", data)
-    query_result = []
-    for query_string in query_list:
-        query_result.extend(Product.objects.filter(name__icontains=query_string))
+    else:
+        data = request.session.get('query', '')
+    query_list = [q for q in re.split("[,\- @!~#$%^&*()><?/|]", data) if q]
+    if query_list:
+        query_result = Product.objects.filter(
+            reduce(operator.or_, (Q(name__icontains=q) for q in query_list))
+        )
+    else:
+        query_result = Product.objects.none()
     #每頁顯示3個產品
     paginator = Paginator(query_result, 3)
-    
-    page_number = request.GET.get('page')
 
-    page_number = 1 if page_number == None else int(page_number)
-
-    current_page = paginator.page(page_number)
-    product_list = paginator.get_page(page_number)
+    current_page = paginator.get_page(request.GET.get('page'))
     page_array = list(range(1,paginator.num_pages + 1))
 
     try:

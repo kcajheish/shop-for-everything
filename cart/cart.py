@@ -39,11 +39,14 @@ class Cart(object):
         '''
         產生iterable 內含product instance, total price
         '''
-        for product_id in self.cart.keys():
-            product = Product.objects.get(pk=int(product_id))
-            self.cart[product_id]['product']=product
+        product_ids = [int(pid) for pid in self.cart.keys()]
+        products = Product.objects.filter(pk__in=product_ids)
+        for product in products:
+            self.cart[str(product.id)]['product']=product
 
-        for item in self.cart.values():
+        for product_id, item in self.cart.items():
+            if 'product' not in item:
+                continue
             item['total_price']=item['quantity']*int(item['price'])
             yield item
     

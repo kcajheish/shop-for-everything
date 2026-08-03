@@ -21,8 +21,8 @@ class SignUpForm(forms.Form):
     
     def clean(self):
         cd = super().clean()
-        password = cd['password']
-        password_confirm = cd['password_confirm']
+        password = cd.get('password')
+        password_confirm = cd.get('password_confirm')
         if password and password_confirm and (password != password_confirm):
             self.add_error('password_confirm',"輸入的密碼不一致，請重新輸入")
         return cd

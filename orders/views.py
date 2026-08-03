@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import F
@@ -21,6 +22,12 @@ logger = logging.getLogger(__name__)
 def checkout(request):
     cart = Cart(request)
     if len(cart) == 0:
+        return redirect('cart_detail')
+    product_ids = [int(pid) for pid in cart.cart.keys()]
+    existing_ids = set(Product.objects.filter(pk__in=product_ids).values_list('pk', flat=True))
+    missing = [pid for pid in product_ids if pid not in existing_ids]
+    if missing:
+        messages.error(request, '購物車中的商品已下架，請先移除後再結帳')
         return redirect('cart_detail')
     order = Order.objects.create(customer=request.user)
     for item in cart:

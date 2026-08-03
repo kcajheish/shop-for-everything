@@ -31,19 +31,30 @@ class Product(models.Model):
     def update_stock(self, qty):
         self.stock = qty
 
+    def _generate_slug(self):
+        base = slugify(unidecode(self.name)) or 'product'
+        slug = base
+        num = 2
+        while Product.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            tail = '-%d' % num
+            slug = base[:50 - len(tail)] + tail
+            num += 1
+        return slug
+
     def save(self, *args, **kwargs):
-        self.slug = slugify(unidecode(self.name))
+        if not self.pk:
+            self.slug = self._generate_slug()
         super().save(*args, **kwargs)
-        #將圖片大小調整為200x200像素
-        try:
-            initial_path = self.image.path
-            img = Image.open(self.image.open())
-            size = 300, 300
-            img_resize = img.thumbnail(size)
-            img_resize.save(initial_path, quality=95)
-            print('finish image')
-        except:
-            pass  
+        #將圖片大小調整為300x300像素
+        if self.image and self.image.name != '/default.jpg':
+            try:
+                initial_path = self.image.path
+                img = Image.open(self.image.open())
+                size = 300, 300
+                img.thumbnail(size)
+                img.save(initial_path, quality=95)
+            except (IOError, OSError):
+                pass
 
     def get_absolute_url(self):
         return reverse('product_detail', args = [self.slug])

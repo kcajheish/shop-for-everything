@@ -20,12 +20,13 @@ def cart_detail(request):
     cart = Cart(request)
     return render(request, 'cart/detail.html', {'cart' : cart})
 
+@require_http_methods(['POST'])
 def cart_delete(request):
-    print('message get')
-    is_processed = request.POST['is_processed']
-    product_id = request.POST['product_id']
-    data = {"is_processed" : True, "product_id": product_id}
+    product_id = request.POST.get('product_id')
+    if product_id is None:
+        return JsonResponse({"is_processed": False})
     cart = Cart(request)
-    product = Product.objects.get(pk=product_id)
-    cart.remove(product)
-    return JsonResponse(data)
+    product = Product.objects.filter(pk=product_id).first()
+    if product is not None:
+        cart.remove(product)
+    return JsonResponse({"is_processed": True, "product_id": product_id})

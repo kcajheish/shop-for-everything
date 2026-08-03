@@ -1,6 +1,7 @@
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -95,3 +96,44 @@ class CheckoutTest(TestCase):
         self.client.force_login(self.buyer)
         response = self.client.post(reverse('checkout'))
         self.assertRedirects(response, reverse('cart_detail'))
+
+    def test_checkout_redirects_when_cart_contains_deleted_product(self):
+        self.client.force_login(self.buyer)
+        self.put_in_cart(1)
+        self.product.delete()
+        response = self.client.post(reverse('checkout'))
+        self.assertRedirects(response, reverse('cart_detail'))
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_cart_detail_renders_with_deleted_product(self):
+        self.client.force_login(self.buyer)
+        self.put_in_cart(1)
+        self.product.delete()
+        response = self.client.get(reverse('cart_detail'))
+        self.assertEqual(response.status_code, 200)
+
+
+class OrderProductValidatorTest(TestCase):
+    def setUp(self):
+        self.seller = User.objects.create_user(username='v_seller', password='pw')
+        self.buyer = User.objects.create_user(username='v_buyer', password='pw')
+        self.product = Product.objects.create(
+            name='v', price=10, stock=5, description='d', author=self.seller,
+        )
+        self.order = Order.objects.create(customer=self.buyer)
+
+    def test_negative_quantity_is_rejected(self):
+        op = OrderProduct(
+            order=self.order, from_user=self.buyer, to_user=self.seller,
+            product=self.product, quantity=-1, expense=10,
+        )
+        with self.assertRaises(ValidationError):
+            op.full_clean()
+
+    def test_negative_expense_is_rejected(self):
+        op = OrderProduct(
+            order=self.order, from_user=self.buyer, to_user=self.seller,
+            product=self.product, quantity=1, expense=-10,
+        )
+        with self.assertRaises(ValidationError):
+            op.full_clean()
