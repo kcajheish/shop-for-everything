@@ -20,10 +20,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 't)%0b&=8v4g9kdjk(kmfj6vt9u2dc_8=0!9-x(yaz$t+h8n-ia'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-only-insecure-key-do-not-use-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['MyShop.us-west-2.elasticbeanstalk.com','localhost', '127.0.0.1', '[::1]', '44.231.231.74']
 
@@ -93,6 +93,13 @@ if 'RDS_HOSTNAME' in os.environ:
             },
         }
     }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
 
 
 # Password validation
@@ -143,6 +150,7 @@ STATICFILES_DIRS = [
 
 #authentication setup
 LOGIN_REDIRECT_URL ='/product/list'
+LOGIN_URL = '/user/login'
 
 #setup email backend
 EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
@@ -167,13 +175,21 @@ CELERY_TIMEZONE= ['Asia/Taipei']
 
 #定義cache
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get('CELERY_BROKER_URL'),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient"
-        },
-        "KEY_PREFIX": "my_shop"
+if CELERY_BROKER_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": CELERY_BROKER_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient"
+            },
+            "KEY_PREFIX": "my_shop"
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "KEY_PREFIX": "my_shop"
+        }
+    }

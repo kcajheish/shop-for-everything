@@ -1,40 +1,51 @@
-from django.shortcuts import render
+import logging
+
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.db.models import F
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_http_methods
+
 from cart.cart import Cart
+from products.models import Product
 from .models import Order, OrderProduct
 from .tasks import send_order_success_email
-from django.http import HttpResponse
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.contrib.auth.models import User
-from django.contrib.auth.decorators import login_required
-from cart.decorators import stock_should_enough
-# Create your views here.
+
+logger = logging.getLogger(__name__)
+
+
 @login_required
+@require_http_methods(['POST'])
+@transaction.atomic
 def checkout(request):
-    if request.method == 'POST':
-        order = Order(customer=request.user)
-        order.save()
-        cart = Cart(request)
-        for item in cart:
-            product = item['product']
-            order_product = OrderProduct(
-                order = order,
-                from_user = request.user,
-                to_user = product.author,
-                product = product,
-                quantity = item['quantity'],
-                expense = item['total_price'],
-            )
-            product.update_stock(product.stock - item['quantity'])
-            product.save()
-            order_product.save()
-        #將訂購清單送到使用者信箱
-        
-        send_order_success_email(request.user.id, order.id)
-
-        cart.clear()
-
+    cart = Cart(request)
+    if len(cart) == 0:
+        return redirect('cart_detail')
+    order = Order.objects.create(customer=request.user)
+    for item in cart:
+        product = item['product']
+        quantity = item['quantity']
+        updated = Product.objects.filter(pk=product.pk, stock__gte=quantity).update(
+            stock=F('stock') - quantity
+        )
+        if updated == 0:
+            raise PermissionDenied('庫存不夠')
+        OrderProduct.objects.create(
+            order=order,
+            from_user=request.user,
+            to_user=product.author,
+            product=product,
+            quantity=quantity,
+            expense=item['total_price'],
+        )
+    try:
+        send_order_success_email.delay(request.user.id, order.id)
+    except Exception:
+        logger.exception('Failed to dispatch order confirmation email')
+    cart.clear()
     return render(request, 'orders/success.html')
+
 
 @login_required
 def order_list(request):
@@ -47,11 +58,9 @@ def order_list(request):
             orders[i]['is_end_row'] = True
     return render(request,'orders/list.html', {'orders':orders})
 
+
 @login_required
 def order_detail(request, order_id):
-    order = Order.objects.get(pk=order_id)
+    order = get_object_or_404(Order, pk=order_id, customer=request.user)
     products = order.products.all()
-    for product in products:
-        print(product.product.name)
     return render(request, 'orders/detail.html', {"products": products})
-

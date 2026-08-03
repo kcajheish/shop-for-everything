@@ -12,10 +12,10 @@ class ProductList(APIView):
         return Response(serializer.data)
     def post(self, request, format=None):
         serializer = ProductSerializer(data=request.data)
-        if serializer.is_vaid():
+        if serializer.is_valid():
             serializer.save()
-            return Response(serializer, status=status.HTTP_201_CREATED)
-        return Response(serializer, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ProductDetail(APIView):
     def get_object(self,pk):
@@ -28,12 +28,13 @@ class ProductDetail(APIView):
     def get(self, request, pk, format=None):
         product = self.get_object(pk)
         serializer = ProductSerializer(product)
-        return Response(serialzier.data)
+        return Response(serializer.data)
     
     def put(self, request, pk, format=None):
         product = self.get_object(pk)
         serializer = ProductSerializer(product, data=request.data)
-        if serailzier.is_valid():
+        if serializer.is_valid():
+            serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
