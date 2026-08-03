@@ -3,7 +3,6 @@ from django import forms
 from django.contrib.auth.models import User
 from django.forms.widgets import PasswordInput, EmailInput
 from django.contrib.auth.forms import UserCreationForm
-from django.utils.translation import ugettext_lazy as _
 
 class SignUpForm(forms.Form):
     username = forms.CharField(label="使用者名稱")

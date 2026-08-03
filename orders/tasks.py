@@ -2,6 +2,7 @@ from __future__ import absolute_import, unicode_literals
 #從celery library 輸入shared_task功能
 from celery import shared_task
 import time
+from django.conf import settings
 from django.core.mail import BadHeaderError, send_mail
 from django.contrib.auth.models import User
 from .models import Order
@@ -12,7 +13,6 @@ def say_hello():
     #模擬繁重的運算
     time.sleep(6)
 
-    print('小工人啟動!你好')
     return None
 
 @shared_task
@@ -43,7 +43,7 @@ def send_order_success_email(user_id, order_id):
     send_mail(
         subject ='[下單成功]你已經成功下單',
         message = '',
-        from_email = 'shopEveryThing@myshop.com',
+        from_email = settings.DEFAULT_FROM_EMAIL,
         recipient_list=recipient_list,
         fail_silently = False,
         html_message=html_message,

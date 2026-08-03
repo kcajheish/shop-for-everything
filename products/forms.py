@@ -1,6 +1,5 @@
 from .models import Product
 from django.forms import ModelForm
-from django.utils.translation import gettext_lazy as _
 
 class ProductForm(ModelForm):
 
@@ -8,9 +7,9 @@ class ProductForm(ModelForm):
         model = Product
         fields = ['name', 'description', 'price', 'stock', 'image']
         labels = {
-            'name': _('商品名稱'),
-            'description': _('商品描述'),
-            'price': _('價位'),
-            'stock': _('庫存'),
-            'image': _('商品圖片'),
+            'name': '商品名稱',
+            'description': '商品描述',
+            'price': '價位',
+            'stock': '庫存',
+            'image': '商品圖片',
         }

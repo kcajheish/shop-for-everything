@@ -11,12 +11,8 @@ from functools import reduce
 import operator
 import re
 
-def product_list(request):
-
-    products = Product.objects.all()
-
-    #每頁顯示3個產品
-    paginator = Paginator(products, 3)
+def _pagination_context(request, queryset, per_page=3):
+    paginator = Paginator(queryset, per_page)
 
     current_page = paginator.get_page(request.GET.get('page'))
     page_array = list(range(1,paginator.num_pages + 1))
@@ -30,16 +26,18 @@ def product_list(request):
     except:
         next_page_number = current_page.number
 
-    return render(
-        request, 
-        'products/list.html', 
-        {
-            'current_page' : current_page,
-            'page_array': page_array,
-            'previous_page_number': previous_page_number,
-            'next_page_number': next_page_number
-        }
-    )
+    return {
+        'current_page' : current_page,
+        'page_array': page_array,
+        'previous_page_number': previous_page_number,
+        'next_page_number': next_page_number
+    }
+
+def product_list(request):
+
+    products = Product.objects.all()
+
+    return render(request, 'products/list.html', _pagination_context(request, products))
 
 
 def product_detail(request, slug):
@@ -59,9 +57,9 @@ def product_create(request):
         form = ProductForm()
     return render(request, 'products/create.html', {'form' : form})
 
-@member_is_owner_of_product
-@login_required
 @require_http_methods(['POST'])
+@login_required
+@member_is_owner_of_product
 def product_delete(request):
     product_id = int(request.POST['product_id'])
     product = get_object_or_404(Product, pk=product_id)
@@ -87,28 +85,5 @@ def product_search(request):
         )
     else:
         query_result = Product.objects.none()
-    #每頁顯示3個產品
-    paginator = Paginator(query_result, 3)
 
-    current_page = paginator.get_page(request.GET.get('page'))
-    page_array = list(range(1,paginator.num_pages + 1))
-
-    try:
-        previous_page_number = current_page.previous_page_number()
-    except:
-        previous_page_number = current_page.number
-    try:
-        next_page_number = current_page.next_page_number()
-    except:
-        next_page_number = current_page.number
-
-    return render(
-        request, 
-        'products/list.html', 
-        {
-            'current_page' : current_page,
-            'page_array': page_array,
-            'previous_page_number': previous_page_number,
-            'next_page_number': next_page_number
-        }
-    )
+    return render(request, 'products/list.html', _pagination_context(request, query_result))

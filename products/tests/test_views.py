@@ -10,7 +10,6 @@ class ProductListViewTest(TestCase):
 
     def test_view_accessible_by_name(self):
         response = self.client.get(reverse('product_list'))
-        print(reverse('product_list'))
         self.assertEquals(response.status_code,200)
     
     def test_view_use_correct_template(self):
@@ -81,3 +80,34 @@ class ProductCreateAuthorTest(TestCase):
         self.assertEqual(response.status_code, 302)
         product = Product.objects.get(name='我的商品')
         self.assertEqual(product.author, self.author)
+
+
+class ProductDeleteAccessTest(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='owner', password='pw')
+        self.other = User.objects.create_user(username='other', password='pw')
+        self.product = Product.objects.create(
+            name='del', price=1, stock=5, description='d', author=self.owner,
+        )
+
+    def test_get_is_rejected(self):
+        self.client.force_login(self.owner)
+        response = self.client.get('/product/delete')
+        self.assertEqual(response.status_code, 405)
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        response = self.client.post('/product/delete', {'product_id': self.product.id})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user/login', response.url)
+
+    def test_non_owner_gets_403(self):
+        self.client.force_login(self.other)
+        response = self.client.post('/product/delete', {'product_id': self.product.id})
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Product.objects.filter(pk=self.product.id).exists())
+
+    def test_owner_can_delete(self):
+        self.client.force_login(self.owner)
+        response = self.client.post('/product/delete', {'product_id': self.product.id})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Product.objects.filter(pk=self.product.id).exists())

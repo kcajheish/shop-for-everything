@@ -84,52 +84,73 @@ Review date: 2026-08-03. Priorities are descending (P0 = fix first). Line number
 
 ## P2 — Medium (correctness / robustness)
 
+> Status: all nine P2 items FIXED on 2026-08-03. #15, #16, #20 were already
+> fixed as part of P0 #3 and P1 #6/#8; the rest were fixed here. Verified by
+> regression tests — run with `python manage.py test`.
+
 ### 14. `Cart.add()` `update_quantity` semantics are inverted
 - `cart/cart.py:18-21` — `update_quantity=True` **increments** and `False` **replaces**, the opposite of the name and of the canonical Django implementation. It works today only because the caller (`cart/views.py:15`) passes `True` for existing items. Latent footgun.
 - Fix: swap the branches (replace on `True`, increment on `False`) and flip the caller.
+- Done: branches swapped (`update_quantity=True` now replaces, `False` increments); the caller already passed `True` for existing items, so adding sets the quantity and re-adding replaces it. Tests: `CartAddTest`.
 
 ### 15. Checkout GET / empty cart produce a "success" page
 - `orders/views.py:14,37` — a GET to `/order/checkout` renders `success.html`, and an empty-cart POST creates an empty `Order`.
 - Fix: make it `@require_POST`, and redirect back to the cart with a message when the cart is empty.
+- Done: already fixed with P0 #3 — checkout is `@require_http_methods(['POST'])` (GET → 405) and empty carts redirect to `cart_detail`. Tests: `CheckoutTest::test_checkout_get_is_rejected`, `test_checkout_with_empty_cart_redirects`.
 
 ### 16. Negative or oversized quantities accepted
 - `cart/decorators.py:7-13` — only `quantity > stock` is rejected; `quantity <= 0` is allowed (negative totals), and the check is racy.
 - Fix: require `1 <= quantity <= stock`.
+- Done: already fixed with P1 #8 — `stock_should_enough` requires `1 <= quantity`, accounts for quantity already in the cart, and redirects with a `庫存不足` message instead of raising.
 
 ### 17. N+1 queries
 - `orders/views.py:22-27` (loop), `orders/views.py:53-56` — `order.products.all()` followed by per-row lookups.
 - Fix: use `prefetch_related('products__product')`.
+- Done: `order_detail` now uses `order.products.select_related('product')` (single JOIN for the `OrderProduct.product` FK). Test: `CheckoutTest::test_order_detail_fetches_products_with_single_query` (asserts exactly one `products_product` query for a 3-item order).
 
 ### 18. Login `redirect_field_name` misuse
 - `users/urls.py:11` — `redirect_field_name='product_list'` should be a query-string param name (e.g. `'next'`), not a URL name; combined with `LOGIN_REDIRECT_URL` it works by accident.
 - Fix: drop the argument (default `'next'`) or set it correctly.
+- Done: `redirect_field_name` removed, so `login_required`'s `?next=...` is honored and the post-login redirect returns the user to the page they tried to visit. Tests: `LoginRedirectTest`.
 
 ### 19. `product_delete` decorator order breaks auth flow
 - `products/views.py:63-66` — `member_is_owner_of_product` wraps `login_required`, so anonymous users get a 403 instead of a login redirect, and a GET (or missing `product_id`) raises `KeyError` before `require_http_methods` can reject it.
 - Fix: move `@require_http_methods(['POST'])` and `@login_required` above the ownership check; use `request.POST.get(...)`.
+- Done: decorator order is now `@require_http_methods(['POST'])` → `@login_required` → `@member_is_owner_of_product` (GET → 405, anonymous → login redirect, non-owner → 403); `member_is_owner_of_product` reads `product_id` via `.get()` and 404s unknown products. Tests: `ProductDeleteAccessTest`.
 
 ### 20. Duplicate product results in search
 - See P1 #6 — same product returned once per matched token.
+- Done: already fixed with P1 #6 (single `Q`-based filter, no per-token duplicates). Test: `ProductSearchTest::test_search_does_not_return_duplicates`.
 
 ### 21. Hardcoded sender address
 - `orders/tasks.py:46` — `from_email='shopEveryThing@myshop.com'` must be a verified SendGrid sender or mail is rejected/deferred. Make it a setting.
+- Done: `DEFAULT_FROM_EMAIL` added to settings (env-overridable) and `send_order_success_email` uses it. Tests: `SendOrderEmailTest`, `shop/tests.py::CelerySettingsTest::test_default_from_email_is_configured`.
 
 ### 22. Dev database and media committed to git
 - `db.sqlite3` (contains real user accounts / password hashes) and `media/` (product images) are tracked. Add both to `.gitignore` and rotate any credentials; keep media out of the repo.
+- Done: `db.sqlite3` and `media/` added to `.gitignore` and removed from tracking with `git rm --cached` (files stay on disk, untracked). Remaining action: rotate any credentials that were in the committed `db.sqlite3`.
 
 ## P3 — Low (hygiene / maintenance)
 
+> Status: all five P3 items FIXED on 2026-08-03. Verified by the test suite and
+> `git check-ignore` — run with `python manage.py test`.
+
 ### 23. Celery settings typos
 - `shop/settings.py:162,166` — `CELERY_ACCPET_CONTENT` (typo for `CELERY_ACCEPT_CONTENT`) and `CELERY_TIMEZONE` set to a list instead of a string. Fix both (and confirm the cache/worker still behave).
+- Done: `CELERY_ACCEPT_CONTENT = ['json']` (renamed) and `CELERY_TIMEZONE = 'Asia/Taipei'` (string). Tests: `shop/tests.py::CelerySettingsTest`.
 
 ### 24. Debug `print` statements left in views
 - `cart/views.py:17-18,27`, `cart/decorators.py:11`, `orders/views.py:55`, `orders/tasks.py:15`, `products/models.py:44`. Remove or replace with logging.
+- Done: all remaining `print()` calls removed from app code (`cart` prints were already removed with #8; `orders/tasks.py` and `shop/celery.py` prints removed here; `products/models.py` print removed with #9).
 
 ### 25. No tests outside `products/tests/`
 - `orders/tests.py`, `cart/tests.py`, `api/tests.py`, `users/tests.py` are empty stubs. Add regression tests for the fixes above (checkout atomicity, order authorization, search, signup).
+- Done: `orders/tests.py`, `cart/tests.py`, `users/tests.py` and `api/tests.py` now contain real regression tests (checkout atomicity, order authorization, DRF API, settings, cart semantics/delete, signup, login `next`, delete access).
 
 ### 26. Localization labels without any locale setup
 - `products/forms.py`, `users/forms.py` use `_()` with Chinese strings, but `LANGUAGE_CODE='en-us'` and no `LOCALE_PATHS`/`make_messages` config exist. Either configure i18n properly or drop the `_()` wrappers.
+- Done: the no-op `_()` wrappers were dropped — `products/forms.py` uses plain Chinese labels and the unused `ugettext_lazy` import in `users/forms.py` was removed.
 
 ### 27. Duplicated pagination logic
 - `products/views.py:16-45` and `products/views.py:91-118` are near-identical. Extract a shared helper.
+- Done: `product_list` and `product_search` now share `_pagination_context(request, queryset, per_page=3)` in `products/views.py`. Existing `PaginationTest` and `ProductSearchTest` cover both.

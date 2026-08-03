@@ -32,3 +32,22 @@ class SignUpFormTest(TestCase):
         })
         self.assertRedirects(response, '/user/signup-success')
         self.assertTrue(User.objects.filter(username='newbie3').exists())
+
+
+class LoginRedirectTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='nextuser', password='pw')
+
+    def test_login_honors_next_parameter(self):
+        response = self.client.post('/user/login', {
+            'username': 'nextuser',
+            'password': 'pw',
+            'next': '/order/list',
+        })
+        self.assertRedirects(response, '/order/list')
+
+    def test_login_required_redirect_includes_next(self):
+        response = self.client.get('/order/list')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user/login', response.url)
+        self.assertIn('next=/order/list', response.url)

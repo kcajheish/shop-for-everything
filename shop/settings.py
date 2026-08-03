@@ -152,6 +152,9 @@ STATICFILES_DIRS = [
 LOGIN_REDIRECT_URL ='/product/list'
 LOGIN_URL = '/user/login'
 
+#email sender (must be a verified SendGrid sender)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'shopEveryThing@myshop.com')
+
 #setup email backend
 EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
@@ -167,11 +170,11 @@ CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')#redis://:password@hostna
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
 
 #安全性考量，確保第三方無法控制broker memory的狀態
-CELERY_ACCPET_CONTENT = ['json']
+CELERY_ACCEPT_CONTENT = ['json']
 
 CELERY_RESULT_ACCEPT_CONTENT = ['json']
 
-CELERY_TIMEZONE= ['Asia/Taipei']
+CELERY_TIMEZONE = 'Asia/Taipei'
 
 #定義cache
 

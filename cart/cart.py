@@ -16,9 +16,9 @@ class Cart(object):
         
         item = self.cart[product_id]
         if update_quantity == True:
-            item['quantity'] += quantity
-        else:
             item['quantity'] = quantity
+        else:
+            item['quantity'] += quantity
         self.save()
 
     def remove(self, product):

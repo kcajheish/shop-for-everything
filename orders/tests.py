@@ -112,6 +112,22 @@ class CheckoutTest(TestCase):
         response = self.client.get(reverse('cart_detail'))
         self.assertEqual(response.status_code, 200)
 
+    def test_order_detail_fetches_products_with_single_query(self):
+        self.client.force_login(self.buyer)
+        order = Order.objects.create(customer=self.buyer)
+        for _ in range(3):
+            OrderProduct.objects.create(
+                order=order, from_user=self.buyer, to_user=self.seller,
+                product=self.product, quantity=1, expense=10,
+            )
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+        product_queries = [q for q in ctx.captured_queries if 'products_product' in q['sql']]
+        self.assertEqual(len(product_queries), 1)
+
 
 class OrderProductValidatorTest(TestCase):
     def setUp(self):
@@ -137,3 +153,25 @@ class OrderProductValidatorTest(TestCase):
         )
         with self.assertRaises(ValidationError):
             op.full_clean()
+
+
+class SendOrderEmailTest(TestCase):
+    def setUp(self):
+        self.seller = User.objects.create_user(username='e_seller', password='pw')
+        self.buyer = User.objects.create_user(username='e_buyer', password='pw', email='buyer@example.com')
+        self.product = Product.objects.create(
+            name='e', price=10, stock=5, description='d', author=self.seller,
+        )
+        self.order = Order.objects.create(customer=self.buyer)
+        OrderProduct.objects.create(
+            order=self.order, from_user=self.buyer, to_user=self.seller,
+            product=self.product, quantity=1, expense=10,
+        )
+
+    @mock.patch('orders.tasks.send_mail')
+    def test_email_uses_configured_sender(self, send_mail):
+        from django.conf import settings
+        from orders.tasks import send_order_success_email
+        send_order_success_email(self.buyer.id, self.order.id)
+        _, kwargs = send_mail.call_args
+        self.assertEqual(kwargs['from_email'], settings.DEFAULT_FROM_EMAIL)

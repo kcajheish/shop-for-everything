@@ -14,8 +14,3 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 
 #從django定義的所有app folder，尋找celery註冊的function
 app.autodiscover_tasks()
-
-
-@app.task(bind=True)
-def debug_task(self):
-    print('Request: {0!r}'.format(self.request))

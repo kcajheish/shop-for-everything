@@ -8,3 +8,9 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Local development database
+db.sqlite3*
+
+# User-uploaded media
+media/

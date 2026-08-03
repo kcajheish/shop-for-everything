@@ -14,3 +14,14 @@ class SettingsSecurityTest(TestCase):
     def test_debug_defaults_to_false(self):
         if 'DJANGO_DEBUG' not in os.environ:
             self.assertFalse(settings.DEBUG)
+
+
+class CelerySettingsTest(TestCase):
+    def test_celery_accept_content_is_configured(self):
+        self.assertTrue(hasattr(settings, 'CELERY_ACCEPT_CONTENT'))
+
+    def test_celery_timezone_is_a_string(self):
+        self.assertIsInstance(settings.CELERY_TIMEZONE, str)
+
+    def test_default_from_email_is_configured(self):
+        self.assertEqual(settings.DEFAULT_FROM_EMAIL, 'shopEveryThing@myshop.com')

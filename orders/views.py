@@ -69,5 +69,5 @@ def order_list(request):
 @login_required
 def order_detail(request, order_id):
     order = get_object_or_404(Order, pk=order_id, customer=request.user)
-    products = order.products.all()
+    products = order.products.select_related('product')
     return render(request, 'orders/detail.html', {"products": products})

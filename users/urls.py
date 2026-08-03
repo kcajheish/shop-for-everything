@@ -10,7 +10,6 @@ urlpatterns = [
         'login', 
         auth_views.LoginView.as_view(
             template_name='users/login.html', 
-            redirect_field_name='product_list',
         ), 
         name = 'login'
     ),

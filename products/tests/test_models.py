@@ -28,7 +28,6 @@ class ProductModelTest(TestCase):
     def test_name_max_length(self):
         #在test裡，被建立的第一個物件id為1
         product = Product.objects.get(pk=1)
-        print(product.slug)
         max_length = product._meta.get_field('name').max_length
         #左邊實際值 右邊期望值
         self.assertEquals(max_length, 50)
