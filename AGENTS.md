@@ -11,6 +11,20 @@ Legacy Django 2.1 e-commerce app ("shop") with session-based cart, Celery/Redis,
 - Tests: `python manage.py test` — real tests in `products/tests/` (`test_models.py`, `test_views.py`), plus `orders/tests.py`, `api/tests.py`, `shop/tests.py` covering checkout atomicity, order authorization, the DRF API, and settings security.
 - No lint, formatter, or typecheck config; no CI. Nothing to run besides tests.
 
+## Docker Compose (local stack)
+
+- Stack: `web` (Django dev server on `http://localhost:8000`), `worker` (Celery), `migrate` (one-shot, runs before web/worker), `mysql:5.7`, `redis:6`.
+- Commands:
+  - `docker compose up --build` — build, migrate, boot everything.
+  - `docker compose ps` / `docker compose logs -f web` — inspect.
+  - `docker compose down` — stop (keeps the `mysql_data` volume); `docker compose down -v` also wipes the DB.
+- Env vars come from `env.yaml` at the repo root (gitignored; `cp env.example.yaml env.yaml` on a fresh clone). The container `entrypoint.sh` parses it with `scripts/yaml_to_env.py` (prints shell `export`s) and `exec`s the command — **not** Compose's `!include`/`env_file`, since this Compose build doesn't support `!include` for env and `env_file` is dotenv-only.
+- `env.yaml` sets `RDS_HOSTNAME=mysql` etc., so the container always uses MySQL (never SQLite). Verify container env via `docker compose exec web cat /proc/1/environ` — `docker compose exec` spawns a fresh process that does NOT inherit entrypoint-exported vars.
+- DB passwords for `mysql` come from the inline `MYSQL_*` vars in `docker-compose.yml` (root: `rootpass`, db/user/password `shop`); they must match `env.yaml`. MySQL port 3306 is not exposed to the host.
+- `mysql:5.7` is used deliberately: the 2020-era `mysqlclient==1.4.6` builds against the MariaDB C client and can fail auth against MySQL 8's `caching_sha2_password`.
+- The `python:3.8-slim-buster` base is EOL; the Dockerfile repoints apt to `archive.debian.org` so `pip install` (compiles `mysqlclient`, `gevent`, `greenlet`, `Pillow`) succeeds. Build takes ~3 min.
+- To run a Django management command with the stack's env (e.g. `createsuperuser`), wrap it in the entrypoint: `docker compose exec web /app/entrypoint.sh python manage.py createsuperuser`.
+
 ## Architecture
 
 - Project package `shop` (`shop/settings.py`, `shop/urls.py`); apps: `products`, `users`, `cart`, `orders`, `api`. URLs mounted at `/product/`, `/user/`, `/cart/`, `/order/`, `/api/`, `/admin/`; media served at `/media/`.

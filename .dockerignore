@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+db.sqlite3
+media
+env.yaml
+.env
+.elasticbeanstalk
+.idea
+.DS_Store
