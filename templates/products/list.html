@@ -1,42 +1,48 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card-deck">
+<h1 class="mb-4">商品列表</h1>
+<div class="row">
     {% for product in current_page.object_list %}
-        <div class="col-sm-3">
-            <div class="card" style="width: 16rem;">
-                <img class="card-img-top" src="{{ product.image.url }}" alt="Card image cap">
-                <div class="card-body">
-                <h5 class="card-title">{{ product.name }}</h5>
-                <ul class="card-text">
-                    <li>名稱： {{ product.name }}</li>
-                    <li>價錢： {{ product.price }}</li>
-                    <li>庫存： {{ product.stock }}</li>
-                    <li>店家:  {{ product.author.username }}</li>
-                </ul>
-                <a href="{% url 'product_detail' product.slug %}" class="btn btn-primary">查看</a>
+        <div class="col-12 col-sm-6 col-lg-4 col-xl-3 mb-4">
+            <div class="card h-100">
+                <img class="card-img-top product-card-img" src="{{ product.image.url }}" alt="{{ product.name }}">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ product.name }}</h5>
+                    <ul class="list-unstyled mb-3">
+                        <li>價錢： <span class="product-price">{{ product.price }}</span></li>
+                        <li class="text-muted">庫存： {{ product.stock }}</li>
+                        <li class="text-muted">店家： {{ product.author.username }}</li>
+                    </ul>
+                    <a href="{% url 'product_detail' product.slug %}" class="btn btn-primary mt-auto">查看</a>
                 </div>
             </div>
         </div>
+    {% empty %}
+        <div class="col-12">
+            <p class="text-center text-muted py-5">目前沒有任何商品</p>
+        </div>
     {% endfor %}
-    </div>
-    <nav aria-label="Page navigation example">
-        <ul class="pagination">
-            <li class="page-item">
-                <a class="page-link" href="?page={{ previous_page_number }}" aria-label="Previous">
+</div>
+<nav aria-label="Page navigation">
+    <ul class="pagination">
+        <li class="page-item{% if current_page.number == previous_page_number %} disabled{% endif %}">
+            <a class="page-link" href="?page={{ previous_page_number }}" aria-label="Previous"{% if current_page.number == previous_page_number %} tabindex="-1" aria-disabled="true"{% endif %}>
                 <span aria-hidden="true">&laquo;</span>
                 <span class="sr-only">前一頁</span>
-                </a>
+            </a>
+        </li>
+        {% for page in page_array %}
+            <li class="page-item{% if page == current_page.number %} active{% endif %}">
+                <a class="page-link" href="?page={{ page }}">{{ page }}</a>
             </li>
-            {% for page in page_array %}
-                <li class="page-item"><a class="page-link" href="?page={{ page }}">{{ page }}</a></li>
-            {% endfor %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ next_page_number }}" aria-label="Next">
+        {% endfor %}
+        <li class="page-item{% if current_page.number == next_page_number %} disabled{% endif %}">
+            <a class="page-link" href="?page={{ next_page_number }}" aria-label="Next"{% if current_page.number == next_page_number %} tabindex="-1" aria-disabled="true"{% endif %}>
                 <span aria-hidden="true">&raquo;</span>
                 <span class="sr-only">下一頁</span>
-                </a>
-            </li>
-        </ul>
-      </nav>
+            </a>
+        </li>
+    </ul>
+</nav>
 {% endblock %}
